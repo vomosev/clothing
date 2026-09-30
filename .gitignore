@@ -1,0 +1,7 @@
+
+# Added by install_frontend.js — build output and secrets must never be committed
+node_modules
+.next
+.vercel
+.env
+.env.local
