@@ -3,10 +3,14 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/contexts/AuthContext';
-import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
-import Field from '@/components/ui/Field';
+import { useAuth } from '../../context/AuthContext';
+import Button from '../../components/ui/Button';
+import Card, {
+  CardHeader,
+  CardBody,
+  CardFooter,
+} from '../../components/ui/Card';
+import Field from '../../components/ui/Input';
 
 const DEFAULT_NEXT_PATH = '/account';
 
@@ -86,9 +90,7 @@ function SignupForm() {
       const message = err instanceof Error ? err.message : '';
       const isDuplicate =
         err?.status === 409 || /already|exists|duplicate/i.test(message);
-      const isNetworkError =
-        err instanceof TypeError ||
-        /network|failed to fetch|fetch failed/i.test(message);
+      const isNetworkError = err?.status === 0;
 
       if (isDuplicate) {
         setError(message || 'An account with this email already exists.');
@@ -103,67 +105,73 @@ function SignupForm() {
   }
 
   return (
-    <main className="auth-page">
+    <section className="auth-page">
       <Card className="auth-card">
-        <h1 className="auth-title">Create an account</h1>
+        <CardHeader>
+          <h1 className="auth-title">Create an account</h1>
+        </CardHeader>
 
-        {error && (
-          <div className="form-error" role="alert">
-            {error}
-          </div>
-        )}
+        <CardBody>
+          {error && (
+            <div className="form__error" role="alert">
+              {error}
+            </div>
+          )}
 
-        <form onSubmit={handleSubmit} className="auth-form">
-          <Field
-            id="name"
-            name="name"
-            type="text"
-            label="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            autoComplete="name"
-            required
-          />
+          <form onSubmit={handleSubmit} className="form">
+            <Field
+              id="name"
+              name="name"
+              type="text"
+              label="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              autoComplete="name"
+              required
+            />
 
-          <Field
-            id="email"
-            name="email"
-            type="email"
-            label="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-          />
+            <Field
+              id="email"
+              name="email"
+              type="email"
+              label="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
 
-          <Field
-            id="password"
-            name="password"
-            type="password"
-            label="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            required
-            minLength={8}
-          />
+            <Field
+              id="password"
+              name="password"
+              type="password"
+              label="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+              minLength={8}
+            />
 
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Creating account...' : 'Sign up'}
-          </Button>
-        </form>
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Creating account...' : 'Sign up'}
+            </Button>
+          </form>
+        </CardBody>
 
-        <p className="auth-footer">
-          Already have an account?{' '}
-          <Link
-            href={`/login?next=${encodeURIComponent(redirectTo)}`}
-            className="auth-link"
-          >
-            Log in
-          </Link>
-        </p>
+        <CardFooter>
+          <p className="auth-card__foot">
+            Already have an account?{' '}
+            <Link
+              href={`/login?next=${encodeURIComponent(redirectTo)}`}
+              className="auth-link"
+            >
+              Log in
+            </Link>
+          </p>
+        </CardFooter>
       </Card>
-    </main>
+    </section>
   );
 }
 
