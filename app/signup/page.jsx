@@ -3,11 +3,45 @@
 import { Suspense, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
+import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import Field from '@/components/ui/Field';
+
+const DEFAULT_NEXT_PATH = '/account';
+
+function getSafeNextPath(value) {
+  if (
+    !value ||
+    !value.startsWith('/') ||
+    value.startsWith('//') ||
+    value.includes('\\') ||
+    /[\u0000-\u001F\u007F]/.test(value)
+  ) {
+    return DEFAULT_NEXT_PATH;
+  }
+
+  try {
+    decodeURI(value);
+
+    const baseUrl = new URL('https://app.invalid');
+    const url = new URL(value, baseUrl);
+
+    if (url.origin !== baseUrl.origin) {
+      return DEFAULT_NEXT_PATH;
+    }
+
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return DEFAULT_NEXT_PATH;
+  }
+}
 
 function SignupForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get('redirect') || searchParams.get('callbackUrl') || '/';
+  const redirectTo = getSafeNextPath(searchParams.get('next'));
+  const { signup } = useAuth();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -18,112 +52,124 @@ function SignupForm() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+
+    const trimmedName = name.trim();
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!trimmedName) {
+      setError('Please enter your name.');
+      return;
+    }
+
+    if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+      await signup({
+        fullName: trimmedName,
+        email: normalizedEmail,
+        password,
       });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data.error || 'Something went wrong. Please try again.');
-        setLoading(false);
-        return;
-      }
 
       router.push(redirectTo);
       router.refresh();
     } catch (err) {
-      setError('Something went wrong. Please try again.');
+      const message = err instanceof Error ? err.message : '';
+      const isDuplicate =
+        err?.status === 409 || /already|exists|duplicate/i.test(message);
+      const isNetworkError =
+        err instanceof TypeError ||
+        /network|failed to fetch|fetch failed/i.test(message);
+
+      if (isDuplicate) {
+        setError(message || 'An account with this email already exists.');
+      } else if (isNetworkError) {
+        setError('Unable to connect. Please check your connection and try again.');
+      } else {
+        setError(message || 'Something went wrong. Please try again.');
+      }
+    } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <div className="w-full max-w-md rounded-lg border p-6 shadow-sm">
-        <h1 className="mb-6 text-2xl font-bold">Create an account</h1>
+    <main className="auth-page">
+      <Card className="auth-card">
+        <h1 className="auth-title">Create an account</h1>
 
         {error && (
-          <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+          <div className="form-error" role="alert">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="name" className="mb-1 block text-sm font-medium">
-              Name
-            </label>
-            <input
-              id="name"
-              name="name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              className="w-full rounded border px-3 py-2"
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="auth-form">
+          <Field
+            id="name"
+            name="name"
+            type="text"
+            label="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            autoComplete="name"
+            required
+          />
 
-          <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium">
-              Email
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              className="w-full rounded border px-3 py-2"
-            />
-          </div>
+          <Field
+            id="email"
+            name="email"
+            type="email"
+            label="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
 
-          <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium">
-              Password
-            </label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={8}
-              className="w-full rounded border px-3 py-2"
-            />
-          </div>
+          <Field
+            id="password"
+            name="password"
+            type="password"
+            label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="new-password"
+            required
+            minLength={8}
+          />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded bg-black px-4 py-2 text-white disabled:opacity-50"
-          >
+          <Button type="submit" disabled={loading}>
             {loading ? 'Creating account...' : 'Sign up'}
-          </button>
+          </Button>
         </form>
 
-        <p className="mt-4 text-center text-sm">
+        <p className="auth-footer">
           Already have an account?{' '}
-          <Link href="/login" className="underline">
+          <Link
+            href={`/login?next=${encodeURIComponent(redirectTo)}`}
+            className="auth-link"
+          >
             Log in
           </Link>
         </p>
-      </div>
-    </div>
+      </Card>
+    </main>
   );
 }
 
 export default function SignupPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="auth-page">Loading...</div>}>
       <SignupForm />
     </Suspense>
   );
