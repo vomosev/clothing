@@ -12,13 +12,30 @@ function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(value || '').trim());
 }
 
+function getSafeNextPath(value) {
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
+    return '/account';
+  }
+
+  try {
+    decodeURI(value);
+    const url = new URL(value, 'https://monolith.local');
+    if (url.origin !== 'https://monolith.local') {
+      return '/account';
+    }
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return '/account';
+  }
+}
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, status } = useAuth();
 
   const nextParam = searchParams?.get('next') || '/account';
-  const safeNext = nextParam.startsWith('/') ? nextParam : '/account';
+  const safeNext = getSafeNextPath(nextParam);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -126,7 +143,9 @@ function LoginForm() {
         </CardBody>
         <CardFooter>
           <p className="auth-card__aside">
-            New to MONOLITH? <Link href="/signup">Create an account</Link> to check out faster.
+            New to MONOLITH?{' '}
+            <Link href={`/signup?next=${encodeURIComponent(safeNext)}`}>Create an account</Link> to check out
+            faster.
           </p>
         </CardFooter>
       </Card>
